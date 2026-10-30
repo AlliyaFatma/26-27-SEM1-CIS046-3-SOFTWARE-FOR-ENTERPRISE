@@ -1,10 +1,13 @@
 # 🍌 Banana Classroom - MERN Stack Portal
 
 A modern web application built with **React**, **Node.js**, **Express.js**, and **MongoDB Atlas**, featuring:
-- **Landing Page**: Responsive hero section, interactive mockup, enterprise feature cards, and CTAs.
-- **User Authentication**: Simple Sign Up and Log In requiring **Email and Password only** with salted bcrypt hashing and JWT tokens.
-- **Dashboard**: Authenticated user portal with role badge (`student` / `teacher`), course overview, and session verification.
-- **MongoDB Atlas Integration**: Cloud database document storage with Mongoose schemas and unique email validation.
+- **Teacher & Student Architecture**:
+  - **Teacher Login & Sign Up**: Teachers register with email and password to access their dedicated management dashboard.
+  - **Classroom Code Generation**: Teachers create classroom codes (e.g. `MATH-4921`, `BANANA-101`) to distribute to their students.
+  - **Navbar "Student" Entry**: Students can click the **Student** button directly from the navbar, enter their nickname/username and classroom code—without needing an account!
+  - **10 Math Puzzle Challenge**: Students solve exactly 10 Banana Math puzzles from Dr. Marc Conrad's API with an interactive progress tracker, timer, hints, and score calculations.
+  - **Classroom Leaderboard on Teacher Dashboard**: Teachers see live classroom rankings of students sorted by score, accuracy, and completion time, with detailed question-by-question answer breakdowns.
+- **MongoDB Atlas Integration**: Cloud database document storage with Mongoose schemas for users, classrooms, and student submissions.
 
 ---
 
@@ -24,11 +27,17 @@ A modern web application built with **React**, **Node.js**, **Express.js**, and 
 │   ├── config/
 │   │   └── db.js            # MongoDB Atlas connection handler
 │   ├── models/
-│   │   └── User.js          # Mongoose user model with bcrypt pre-save hash
+│   │   ├── User.js          # User model (teachers & students) with bcrypt hash
+│   │   ├── Classroom.js     # Classroom codes created by teachers
+│   │   └── ClassroomSubmission.js # Student 10-puzzle challenge submissions
 │   ├── controllers/
-│   │   └── authController.js# Register, login, and profile controllers
+│   │   ├── authController.js# Register, login, and profile controllers
+│   │   ├── gameController.js# Banana puzzle and player stats controllers
+│   │   └── classroomController.js # Classroom code & leaderboard controllers
 │   ├── routes/
-│   │   └── authRoutes.js    # Authentication endpoints (/api/auth)
+│   │   ├── authRoutes.js    # Authentication endpoints (/api/auth)
+│   │   ├── gameRoutes.js    # Game endpoints (/api/game)
+│   │   └── classroomRoutes.js # Classroom endpoints (/api/classroom)
 │   └── middleware/
 │       └── authMiddleware.js# JWT Bearer token protection middleware
 │
@@ -43,10 +52,11 @@ A modern web application built with **React**, **Node.js**, **Express.js**, and 
         ├── context/
         │   └── AuthContext.jsx # React Context for auth state & token storage
         └── components/
-            ├── Navbar.jsx      # Navigation bar & authentication actions
-            ├── LandingPage.jsx # Enterprise landing page
-            ├── AuthForm.jsx    # Dual-mode Sign Up & Log In form
-            └── Dashboard.jsx   # Post-login dashboard & profile preview
+            ├── Navbar.jsx           # Nav bar with dedicated Student button & teacher actions
+            ├── LandingPage.jsx      # Landing page with student and teacher entry points
+            ├── AuthForm.jsx         # Teacher/student login & role-based sign up
+            ├── StudentChallenge.jsx # Student 10-puzzle challenge & live classroom leaderboard
+            └── Dashboard.jsx        # Teacher dashboard: manage classroom codes & view leaderboard
 ```
 
 ---
@@ -58,24 +68,17 @@ A modern web application built with **React**, **Node.js**, **Express.js**, and 
 3. **Set Up Database Access (User)**:
    - In Atlas left sidebar, click **Security** > **Database Access**.
    - Click **Add New Database User**.
-   - Create a username (e.g. `alliya`) and password (e.g. `Password123!`). Select **Read and write to any database**.
+   - Create a username and password. Select **Read and write to any database**.
 4. **Set Up Network Access (IP Whitelist)**:
    - In Atlas left sidebar, click **Security** > **Network Access**.
    - Click **Add IP Address** -> Select **Allow Access from Anywhere** (`0.0.0.0/0`) -> Click **Confirm**.
-5. **Get Your Connection String**:
-   - Go to **Deployments** > **Database** > Click **Connect** on your cluster.
-   - Choose **Drivers** (Node.js).
-   - Copy the connection string. It looks like:
-     ```text
-     mongodb+srv://<username>:<password>@cluster0.abcde.mongodb.net/banana_classroom?retryWrites=true&w=majority
-     ```
-6. **Paste into `server/.env`**:
+5. **Paste into `server/.env`**:
    Open [`server/.env`](file:///Users/nirushmanshrestha/Documents/Uni%20/ff/26-27-SEM1-CIS046-3-SOFTWARE-FOR-ENTERPRISE/server/.env) and update `MONGODB_URI`:
    ```env
-   MONGODB_URI=mongodb+srv://alliya:Password123!@cluster0.abcde.mongodb.net/banana_classroom?retryWrites=true&w=majority
+   MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.abcde.mongodb.net/banana_classroom?retryWrites=true&w=majority
    ```
 
-> 💡 **Notice:** If you don't enter an Atlas string or while you are creating your cluster, the server will automatically use an embedded in-memory development database so you can register, log in, and test immediately without getting blocked!
+> 💡 **Notice:** If you don't enter an Atlas string, the server automatically starts an embedded development database so you can test immediately.
 
 ---
 
@@ -107,30 +110,27 @@ Frontend will run at: `http://localhost:5173`
 
 ## 🔑 API Endpoints
 
-### 🔐 Authentication Endpoints
+### 🏫 Classroom & Student Challenge Endpoints (`/api/classroom`)
 | Method | Endpoint | Description | Protected |
 |---|---|---|---|
-| `POST` | `/api/auth/register` | Register a new user | No |
+| `POST` | `/api/classroom/create` | Teacher creates a classroom with a custom/auto code | Yes (Teacher) |
+| `GET` | `/api/classroom/my-classrooms` | Teacher retrieves all their classrooms and stats | Yes (Teacher) |
+| `DELETE` | `/api/classroom/:id` | Teacher deletes a classroom and its submissions | Yes (Teacher) |
+| `GET` | `/api/classroom/validate/:code` | Validate classroom code when student joins | No |
+| `POST` | `/api/classroom/submit` | Student submits 10-puzzle results to leaderboard | No |
+| `GET` | `/api/classroom/:code/leaderboard` | Get ranked classroom leaderboard for a code | No |
+
+### 🔐 Authentication Endpoints (`/api/auth`)
+| Method | Endpoint | Description | Protected |
+|---|---|---|---|
+| `POST` | `/api/auth/register` | Register a new user (`role`: `'teacher'` or `'student'`) | No |
 | `POST` | `/api/auth/login` | Authenticate user & get JWT token | No |
 | `GET` | `/api/auth/me` | Fetch current user profile | Yes (`Bearer <token>`) |
-| `GET` | `/api/health` | Health check endpoint | No |
 
-### 🍌 Banana Game Endpoints (Marc Conrad API)
+### 🍌 Banana Game Endpoints (`/api/game`)
 | Method | Endpoint | Description | Protected |
 |---|---|---|---|
-| `GET` | `/api/game/puzzle` | Fetch new puzzle from Marc Conrad API (`https://marcconrad.com/uob/banana/api.php`) | No |
-| `POST` | `/api/game/record` | Submit guess, compute points, streak & update MongoDB | Yes (`Bearer <token>`) |
-| `GET` | `/api/game/stats` | Retrieve user stats, win rate & recent history | Yes (`Bearer <token>`) |
-| `GET` | `/api/game/leaderboard` | Top 10 classroom ranking by score | No |
-| `POST` | `/api/game/reset` | Reset player score & streaks | Yes (`Bearer <token>`) |
-
----
-
-## 🎮 Dr. Marc Conrad Banana API Integration
-
-- **External API Reference**: [Marc Conrad Banana Game API Documentation](https://marcconrad.com/uob/banana/doc.php)
-- **Original Game Demo**: [The Banana Game Demo](https://marcconrad.com/uob/banana/)
-- **Dashboard Features**:
-  1. **Banana Math Arena**: Live puzzle image rendering from Dr. Marc Conrad's API with responsive 0–9 keypad input, keyboard controls, real-time verification, round timer, and hints.
-  2. **Classroom Leaderboard**: Real-time rank of top students with win rates and points.
-  3. **Match History**: Persistent log of puzzle attempts, guesses, answers, and scores in MongoDB Atlas.
+| `GET` | `/api/game/puzzle` | Fetch fresh puzzle from Marc Conrad Banana API | No |
+| `POST` | `/api/game/record` | Submit guess, update score and streak | Yes (`Bearer <token>`) |
+| `GET` | `/api/game/stats` | Retrieve user stats, win rate & history | Yes (`Bearer <token>`) |
+| `GET` | `/api/game/leaderboard` | Global player leaderboard | No |
