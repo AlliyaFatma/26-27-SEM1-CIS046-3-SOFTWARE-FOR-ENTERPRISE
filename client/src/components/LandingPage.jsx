@@ -1,61 +1,86 @@
 import React from 'react';
+import { GraduationCap, Users, Trophy, ArrowRight, Sparkles, CheckCircle2 } from 'lucide-react';
 
-export default function LandingPage({ onGetStarted, onLogin }) {
+export default function LandingPage({ onGetStarted, onLogin, onStudentJoin }) {
   return (
-    <div className="simple-landing">
+    <div className="landing-page">
       {/* Hero Section */}
-      <section className="simple-hero">
-        <div className="container">
-          <div className="simple-hero-content">
-            <h1 className="simple-title">Banana Classroom</h1>
-            <p className="simple-subtitle">
-              A clean and simple user authentication portal built with React, Node.js, Express, and MongoDB Atlas.
-            </p>
+      <section className="hero-section">
+        <div className="container hero-container">
+          <h1 className="hero-title">
+            Banana Classroom
+          </h1>
+          <p className="hero-subtitle">
+            Interactive math challenges for schools. Teachers create classroom codes and monitor real-time student leaderboards—no student accounts or passwords required.
+          </p>
 
-            <div className="simple-actions">
-              <button className="btn btn-primary btn-lg" onClick={onGetStarted}>
-                Sign Up
-              </button>
-              <button className="btn btn-outline btn-lg" onClick={onLogin}>
-                Log In
-              </button>
+          <div className="hero-actions">
+            <button 
+              className="btn btn-primary btn-lg hero-cta-btn" 
+              onClick={onStudentJoin}
+            >
+              <GraduationCap size={18} />
+              <span>Enter Classroom Code</span>
+              <ArrowRight size={16} />
+            </button>
+
+            <button 
+              className="btn btn-outline btn-lg" 
+              onClick={onLogin}
+            >
+              <Users size={16} />
+              <span>Teacher Portal</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Product Highlights */}
+      <section className="features-section">
+        <div className="container">
+          <div className="features-grid">
+            <div className="feature-card">
+              <div className="feature-header">
+                <span className="feature-num">01</span>
+                <h3>Classroom Codes</h3>
+              </div>
+              <p>
+                Teachers generate instant classroom codes to share with students. Manage multiple classrooms from a single dashboard.
+              </p>
+            </div>
+
+            <div className="feature-card">
+              <div className="feature-header">
+                <span className="feature-num">02</span>
+                <h3>10 Puzzle Challenge</h3>
+              </div>
+              <p>
+                Students join using only their nickname and code to solve 10 interactive Banana Math puzzles with live accuracy tracking.
+              </p>
+            </div>
+
+            <div className="feature-card">
+              <div className="feature-header">
+                <span className="feature-num">03</span>
+                <h3>Live Leaderboard</h3>
+              </div>
+              <p>
+                Classroom rankings update in real time with scores, completion times, and question-by-question answer breakdowns.
+              </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Info Cards Section */}
-      <section className="simple-info-section">
-        <div className="container">
-          <div className="simple-cards-grid">
-            <div className="simple-card">
-              <h3>Secure Authentication</h3>
-              <p>
-                Sign up with your email and password. Passwords are securely hashed using bcrypt, and user sessions are managed with JSON Web Tokens (JWT).
-              </p>
-            </div>
-
-            <div className="simple-card">
-              <h3>MongoDB Atlas Database</h3>
-              <p>
-                User accounts and credentials are saved in MongoDB Atlas. Connect your cloud cluster easily through environment variables.
-              </p>
-            </div>
-
-            <div className="simple-card">
-              <h3>Express.js REST API</h3>
-              <p>
-                Lightweight and fast Node.js backend with clean endpoints for registration, login, and token verification.
-              </p>
-            </div>
+      {/* Clean Footer */}
+      <footer className="page-footer">
+        <div className="container footer-row">
+          <span>Banana Classroom • Interactive Math Platform</span>
+          <div className="footer-links">
+            <button className="footer-link-btn" onClick={onStudentJoin}>Student Join</button>
+            <button className="footer-link-btn" onClick={onLogin}>Teacher Login</button>
+            <button className="footer-link-btn" onClick={onGetStarted}>Sign Up</button>
           </div>
-        </div>
-      </section>
-
-      {/* Minimal Footer */}
-      <footer className="simple-footer">
-        <div className="container">
-          <p>© Banana Classroom • Full-Stack MERN Application</p>
         </div>
       </footer>
     </div>

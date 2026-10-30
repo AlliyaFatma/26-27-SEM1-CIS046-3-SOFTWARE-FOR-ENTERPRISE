@@ -1,630 +1,450 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { 
   Trophy, 
-  Flame, 
-  Award, 
   RefreshCw, 
   CheckCircle2, 
   XCircle, 
-  HelpCircle, 
   Clock, 
-  Send, 
-  History, 
-  RotateCcw, 
-  Gamepad2, 
-  User as UserIcon, 
-  Sparkles,
-  ChevronRight,
+  Copy, 
+  Check, 
+  Plus, 
+  Trash2, 
+  Eye, 
+  GraduationCap, 
+  Users,
   ShieldCheck
 } from 'lucide-react';
 
-export default function Dashboard({ onLogout }) {
-  const { user, token, logout, updateUser, refreshUser } = useAuth();
+export default function Dashboard({ onLogout, onTestStudentChallenge }) {
+  const { user, token } = useAuth();
 
-  // Active Tab: 'play' | 'leaderboard' | 'history'
-  const [activeTab, setActiveTab] = useState('play');
+  // Active Tab: 'classroom-leaderboard' | 'classrooms'
+  const [activeTab, setActiveTab] = useState('classroom-leaderboard');
 
-  // Game State
-  const [puzzle, setPuzzle] = useState(null); // { question: string, solution: number }
-  const [loadingPuzzle, setLoadingPuzzle] = useState(false);
-  const [puzzleError, setPuzzleError] = useState(null);
-  const [selectedDigit, setSelectedDigit] = useState('');
-  const [feedback, setFeedback] = useState(null); // { type: 'success' | 'error' | 'hint', message: string, points?: number }
-  const [submitting, setSubmitting] = useState(false);
-  const [showHint, setShowHint] = useState(false);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const timerRef = useRef(null);
+  // Teacher Classrooms & Leaderboard State
+  const [myClassrooms, setMyClassrooms] = useState([]);
+  const [loadingClassrooms, setLoadingClassrooms] = useState(false);
+  const [selectedClassroomCode, setSelectedClassroomCode] = useState('');
+  const [classroomLeaderboard, setClassroomLeaderboard] = useState([]);
+  const [classroomDetails, setClassroomDetails] = useState(null);
+  const [classroomStats, setClassroomStats] = useState(null);
+  const [loadingClassLeaderboard, setLoadingClassLeaderboard] = useState(false);
 
-  // Stats & History from Server
-  const [stats, setStats] = useState({
-    score: user?.score || 0,
-    gamesPlayed: user?.gamesPlayed || 0,
-    gamesWon: user?.gamesWon || 0,
-    currentStreak: user?.currentStreak || 0,
-    bestStreak: user?.bestStreak || 0,
-    winRate: user?.gamesPlayed ? Math.round(((user?.gamesWon || 0) / user.gamesPlayed) * 100) : 0
-  });
-  const [historyList, setHistoryList] = useState([]);
-  const [leaderboard, setLeaderboard] = useState([]);
-  const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
+  // Create Classroom Form State
+  const [newClassTitle, setNewClassTitle] = useState('');
+  const [newClassCode, setNewClassCode] = useState('');
+  const [creatingClass, setCreatingClass] = useState(false);
+  const [createNotice, setCreateNotice] = useState({ type: '', text: '' });
+  const [copiedCode, setCopiedCode] = useState('');
+
+  // Inspect Student Modal State
+  const [inspectStudent, setInspectStudent] = useState(null);
   const [actionNotice, setActionNotice] = useState('');
 
-  // Sync user state with stats
-  useEffect(() => {
-    if (user) {
-      setStats(prev => ({
-        ...prev,
-        score: user.score || 0,
-        gamesPlayed: user.gamesPlayed || 0,
-        gamesWon: user.gamesWon || 0,
-        currentStreak: user.currentStreak || 0,
-        bestStreak: user.bestStreak || 0,
-        winRate: user.gamesPlayed ? Math.round(((user.gamesWon || 0) / user.gamesPlayed) * 100) : 0
-      }));
-    }
-  }, [user]);
+  // Format seconds to mm:ss
+  const formatTime = (secs) => {
+    const mins = Math.floor(secs / 60);
+    const remainingSecs = secs % 60;
+    return `${mins}:${remainingSecs < 10 ? '0' : ''}${remainingSecs}`;
+  };
 
-  // Fetch a new puzzle from API
-  const fetchNewPuzzle = useCallback(async () => {
-    setLoadingPuzzle(true);
-    setPuzzleError(null);
-    setFeedback(null);
-    setSelectedDigit('');
-    setShowHint(false);
-    setElapsedSeconds(0);
+  // Copy to clipboard helper
+  const copyToClipboard = (code) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(code);
+    setTimeout(() => setCopiedCode(''), 3000);
+  };
 
-    // Stop timer
-    if (timerRef.current) clearInterval(timerRef.current);
-
-    try {
-      // 1. Try fetching via our server proxy first
-      let res = await fetch('/api/game/puzzle');
-      let data;
-      
-      if (res.ok) {
-        data = await res.json();
-      } else {
-        // Fallback: direct call to Marc Conrad API
-        res = await fetch('https://marcconrad.com/uob/banana/api.php?out=json');
-        data = await res.json();
-      }
-
-      if (data && data.question && data.solution !== undefined) {
-        setPuzzle({
-          question: data.question,
-          solution: Number(data.solution)
-        });
-
-        // Start timer
-        timerRef.current = setInterval(() => {
-          setElapsedSeconds(s => s + 1);
-        }, 1000);
-      } else {
-        throw new Error('Received unexpected format from Banana API');
-      }
-    } catch (err) {
-      console.error('Failed to load puzzle:', err);
-      setPuzzleError('Failed to load puzzle from Banana Game API. Click retry to try again.');
-    } finally {
-      setLoadingPuzzle(false);
-    }
-  }, []);
-
-  // Initial puzzle load
-  useEffect(() => {
-    fetchNewPuzzle();
-    loadStatsAndHistory();
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [fetchNewPuzzle]);
-
-  // Fetch full stats and history from server
-  const loadStatsAndHistory = async () => {
+  // Load teacher classrooms from server
+  const loadTeacherClassrooms = useCallback(async () => {
     if (!token) return;
+    setLoadingClassrooms(true);
     try {
-      const res = await fetch('/api/game/stats', {
+      const res = await fetch('/api/classroom/my-classrooms', {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setStats(data.stats);
-        setHistoryList(data.history || []);
-        updateUser(data.stats);
+        setMyClassrooms(data.classrooms || []);
+        if (data.classrooms && data.classrooms.length > 0 && !selectedClassroomCode) {
+          setSelectedClassroomCode(data.classrooms[0].code);
+        }
       }
     } catch (err) {
-      console.error('Error fetching game stats:', err);
+      console.error('Error fetching classrooms:', err);
+    } finally {
+      setLoadingClassrooms(false);
     }
-  };
+  }, [token, selectedClassroomCode]);
 
-  // Fetch Leaderboard
-  const fetchLeaderboard = async () => {
-    setLoadingLeaderboard(true);
+  // Load classroom leaderboard
+  const loadClassroomLeaderboard = useCallback(async (code) => {
+    const codeToFetch = code || selectedClassroomCode;
+    if (!codeToFetch) return;
+
+    setLoadingClassLeaderboard(true);
     try {
-      const res = await fetch('/api/game/leaderboard');
+      const res = await fetch(`/api/classroom/${encodeURIComponent(codeToFetch)}/leaderboard`);
       const data = await res.json();
       if (res.ok && data.success) {
-        setLeaderboard(data.leaderboard || []);
+        setClassroomLeaderboard(data.leaderboard || []);
+        setClassroomDetails(data.classroom || null);
+        setClassroomStats(data.stats || null);
       }
     } catch (err) {
-      console.error('Error fetching leaderboard:', err);
+      console.error('Error loading classroom leaderboard:', err);
     } finally {
-      setLoadingLeaderboard(false);
+      setLoadingClassLeaderboard(false);
     }
-  };
+  }, [selectedClassroomCode]);
 
-  // Handle Tab Change
-  const handleTabChange = (tab) => {
-    setActiveTab(tab);
-    if (tab === 'leaderboard') {
-      fetchLeaderboard();
-    } else if (tab === 'history') {
-      loadStatsAndHistory();
+  // Initial load
+  useEffect(() => {
+    if (token) {
+      loadTeacherClassrooms();
     }
-  };
+  }, [token, loadTeacherClassrooms]);
 
-  // Submit Answer
-  const handleAnswerSubmit = async (digitToTest) => {
-    const digit = digitToTest !== undefined ? digitToTest : selectedDigit;
-    if (digit === '' || digit === null || isNaN(digit)) {
-      setFeedback({
-        type: 'error',
-        message: 'Please choose a digit (0 to 9) before submitting!'
-      });
-      return;
+  // Load leaderboard when selected classroom changes
+  useEffect(() => {
+    if (selectedClassroomCode) {
+      loadClassroomLeaderboard(selectedClassroomCode);
     }
+  }, [selectedClassroomCode, loadClassroomLeaderboard]);
 
-    if (!puzzle) return;
-
-    setSubmitting(true);
-    const numericGuess = Number(digit);
-    const numericSolution = Number(puzzle.solution);
-    const isCorrect = numericGuess === numericSolution;
-
-    // Stop timer
-    if (timerRef.current) clearInterval(timerRef.current);
+  // Create new classroom handler
+  const handleCreateClassroom = async (e) => {
+    e.preventDefault();
+    setCreateNotice({ type: '', text: '' });
+    setCreatingClass(true);
 
     try {
-      // Record game in MongoDB backend
-      const res = await fetch('/api/game/record', {
+      const res = await fetch('/api/classroom/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          question: puzzle.question,
-          userGuess: numericGuess,
-          solution: numericSolution,
-          timeTakenSec: elapsedSeconds
+          title: newClassTitle.trim() || 'Math Puzzle Challenge',
+          code: newClassCode.trim().toUpperCase(),
+          puzzlesCount: 10
         })
       });
 
       const data = await res.json();
 
       if (res.ok && data.success) {
-        setStats(data.stats);
-        updateUser(data.stats);
-        if (data.history) {
-          setHistoryList(data.history);
-        }
-
-        if (isCorrect) {
-          setFeedback({
-            type: 'success',
-            message: `🎉 Correct! The missing digit was ${numericSolution}!`,
-            points: data.pointsEarned
-          });
-        } else {
-          setFeedback({
-            type: 'error',
-            message: `❌ Not quite! You answered ${numericGuess}, but that is incorrect. Try another guess or check the hint!`
-          });
-        }
+        setCreateNotice({
+          type: 'success',
+          text: `Classroom created! Code: ${data.classroom.code}`
+        });
+        setNewClassTitle('');
+        setNewClassCode('');
+        setSelectedClassroomCode(data.classroom.code);
+        await loadTeacherClassrooms();
+        setActiveTab('classroom-leaderboard');
       } else {
-        // Fallback local update if network hiccups
-        if (isCorrect) {
-          setFeedback({
-            type: 'success',
-            message: `🎉 Correct! The missing digit was ${numericSolution}!`,
-            points: 10
-          });
-        } else {
-          setFeedback({
-            type: 'error',
-            message: `❌ Incorrect digit. Try again!`
-          });
-        }
+        setCreateNotice({
+          type: 'error',
+          text: data.message || 'Failed to create classroom'
+        });
       }
     } catch (err) {
-      console.error('Error submitting answer:', err);
-      if (isCorrect) {
-        setFeedback({
-          type: 'success',
-          message: `🎉 Correct answer: ${numericSolution}!`,
-          points: 10
-        });
-      } else {
-        setFeedback({
-          type: 'error',
-          message: `❌ Incorrect guess. Try again!`
-        });
-      }
+      setCreateNotice({ type: 'error', text: err.message || 'Network error' });
     } finally {
-      setSubmitting(false);
+      setCreatingClass(false);
     }
   };
 
-  // Keyboard number support
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      // Only capture if on play tab and not typing in an input
-      if (activeTab !== 'play') return;
-      if (e.target.tagName === 'INPUT' && e.target.id !== 'banana-custom-input') return;
+  // Delete classroom handler
+  const handleDeleteClassroom = async (id, code, title) => {
+    if (!window.confirm(`Delete classroom "${title}" (${code})? Student records for this code will be permanently removed.`)) {
+      return;
+    }
 
-      if (e.key >= '0' && e.key <= '9') {
-        setSelectedDigit(e.key);
-      } else if (e.key === 'Enter' && selectedDigit !== '') {
-        handleAnswerSubmit();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTab, selectedDigit, puzzle]);
-
-  // Reset Stats Handler
-  const handleResetStats = async () => {
-    if (!window.confirm('Are you sure you want to reset your score and streak to 0?')) return;
     try {
-      const res = await fetch('/api/game/reset', {
-        method: 'POST',
+      const res = await fetch(`/api/classroom/${id}`, {
+        method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setStats(data.stats);
-        setHistoryList([]);
-        updateUser(data.stats);
-        setActionNotice('Your game stats were reset successfully.');
+        setActionNotice(`Classroom ${code} was deleted successfully.`);
         setTimeout(() => setActionNotice(''), 3500);
+        await loadTeacherClassrooms();
+        if (selectedClassroomCode === code) {
+          setSelectedClassroomCode('');
+          setClassroomLeaderboard([]);
+        }
       }
     } catch (err) {
-      console.error('Failed to reset stats:', err);
+      console.error('Delete error:', err);
     }
   };
 
+  const displayName = user?.name || user?.email?.split('@')[0] || 'Teacher';
+
   return (
     <div className="dashboard-page">
-      {/* Top Banner & Header */}
+      {/* Header Banner */}
       <div className="dashboard-hero-banner">
         <div className="container dashboard-header-content">
           <div className="user-welcome-area">
-            <div className="welcome-tag">
-              <span className="role-pill">{user?.role || 'student'}</span>
-            </div>
             <h1 className="welcome-heading">
-              Welcome back, <span className="highlight-name">{user?.name || user?.email?.split('@')[0]}</span>! 🍌
+              Welcome back, <span className="highlight-name">{displayName}</span>
             </h1>
             <p className="welcome-subtext">
-              Solve Dr. Marc Conrad's Banana math puzzles, rack up points, maintain your winning streak, and climb the classroom leaderboard!
+              Manage your classroom codes and monitor real-time student leaderboard results.
             </p>
           </div>
 
-          <div className="header-quick-stats">
-            <div className="stat-pill-group">
-              <div className="stat-pill-card">
-                <div className="pill-icon trophy-bg">
-                  <Trophy size={18} />
-                </div>
-                <div>
-                  <div className="pill-value">{stats.score}</div>
-                  <div className="pill-label">Total Points</div>
-                </div>
+          {/* Active Code Card */}
+          {selectedClassroomCode && (
+            <div className="teacher-quick-code-card">
+              <span className="quick-code-label">Active Classroom Code:</span>
+              <div className="quick-code-row">
+                <span className="code-text-big">{selectedClassroomCode}</span>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm copy-btn"
+                  onClick={() => copyToClipboard(selectedClassroomCode)}
+                  title="Copy Classroom Code"
+                >
+                  {copiedCode === selectedClassroomCode ? (
+                    <>
+                      <Check size={14} /> Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={14} /> Copy Code
+                    </>
+                  )}
+                </button>
               </div>
-
-              <div className="stat-pill-card">
-                <div className="pill-icon flame-bg">
-                  <Flame size={18} />
-                </div>
-                <div>
-                  <div className="pill-value">{stats.currentStreak} 🔥</div>
-                  <div className="pill-label">Streak (Best: {stats.bestStreak})</div>
-                </div>
-              </div>
+              <span className="quick-code-hint">Share this code with students to join from the navbar.</span>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
       {actionNotice && (
         <div className="container notice-banner-wrapper">
           <div className="notice-banner">
-            <ShieldCheck size={18} /> {actionNotice}
+            <ShieldCheck size={16} /> {actionNotice}
           </div>
         </div>
       )}
 
-      {/* Main Content Area */}
+      {/* Main Dashboard Body */}
       <div className="container dashboard-body">
-        {/* Navigation Tabs */}
+        {/* Navigation Tabs (Only Classroom Leaderboard and Manage Classrooms) */}
         <div className="dashboard-tabs-bar">
-          <button 
-            className={`dash-tab-btn ${activeTab === 'play' ? 'active' : ''}`}
-            onClick={() => handleTabChange('play')}
+          <button
+            className={`dash-tab-btn ${activeTab === 'classroom-leaderboard' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('classroom-leaderboard');
+              if (selectedClassroomCode) loadClassroomLeaderboard(selectedClassroomCode);
+            }}
           >
-            <Gamepad2 size={17} /> Banana Math Arena
+            <Trophy size={16} /> Classroom Leaderboard
           </button>
-          <button 
-            className={`dash-tab-btn ${activeTab === 'leaderboard' ? 'active' : ''}`}
-            onClick={() => handleTabChange('leaderboard')}
+
+          <button
+            className={`dash-tab-btn ${activeTab === 'classrooms' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('classrooms');
+              loadTeacherClassrooms();
+            }}
           >
-            <Trophy size={17} /> Classroom Leaderboard
-          </button>
-          <button 
-            className={`dash-tab-btn ${activeTab === 'history' ? 'active' : ''}`}
-            onClick={() => handleTabChange('history')}
-          >
-            <History size={17} /> Match History ({historyList.length})
+            <Users size={16} /> Manage Classrooms & Codes ({myClassrooms.length})
           </button>
         </div>
 
         {/* ========================================================
-            TAB 1: PLAY ARENA
+            TAB 1: CLASSROOM LEADERBOARD
             ======================================================== */}
-        {activeTab === 'play' && (
-          <div className="game-grid-layout">
-            {/* Left: Main Game Arena */}
-            <div className="game-arena-card">
-              <div className="arena-card-top">
-                <div className="arena-title-area">
-                  <h2 className="arena-title">Math Puzzle Challenge</h2>
-                  <span className="arena-subtitle">Find the missing digit (0 - 9) to satisfy the equations</span>
-                </div>
-                <div className="arena-top-actions">
-                  <div className="timer-badge" title="Time on current puzzle">
-                    <Clock size={15} /> {elapsedSeconds}s
-                  </div>
-                  <button 
-                    className="btn btn-outline btn-sm refresh-btn"
-                    onClick={fetchNewPuzzle}
-                    disabled={loadingPuzzle}
-                    title="Get a new puzzle from API"
+        {activeTab === 'classroom-leaderboard' && (
+          <div className="classroom-leaderboard-view">
+            {/* Classroom Selector Bar */}
+            <div className="classroom-select-bar">
+              <div className="select-dropdown-wrap">
+                <label className="select-label" htmlFor="classroom-select">
+                  Classroom:
+                </label>
+                {myClassrooms.length > 0 ? (
+                  <select
+                    id="classroom-select"
+                    className="classroom-select-dropdown"
+                    value={selectedClassroomCode}
+                    onChange={(e) => setSelectedClassroomCode(e.target.value)}
                   >
-                    <RefreshCw size={14} className={loadingPuzzle ? 'spin' : ''} />
-                    <span>Skip / New</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Puzzle Image Container */}
-              <div className="puzzle-display-wrapper">
-                {loadingPuzzle ? (
-                  <div className="puzzle-loading-state">
-                    <div className="spinner spinner-yellow"></div>
-                    <p className="loading-text">Fetching fresh puzzle from Marc Conrad's API...</p>
-                    <span className="loading-url">https://marcconrad.com/uob/banana/api.php</span>
-                  </div>
-                ) : puzzleError ? (
-                  <div className="puzzle-error-state">
-                    <XCircle size={36} color="#ef4444" />
-                    <p>{puzzleError}</p>
-                    <button className="btn btn-primary btn-sm" onClick={fetchNewPuzzle}>
-                      Try Again
-                    </button>
-                  </div>
+                    {myClassrooms.map((cls) => (
+                      <option key={cls._id} value={cls.code}>
+                        {cls.title} (Code: {cls.code}) • {cls.studentCount || 0} Students
+                      </option>
+                    ))}
+                  </select>
                 ) : (
-                  <div className="puzzle-image-frame">
-                    <img 
-                      src={puzzle?.question} 
-                      alt="Banana Math Puzzle" 
-                      className="banana-puzzle-img"
-                    />
-                    <div className="puzzle-source-caption">
-                      <span>Source: Marc Conrad Banana API</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Interactive Keypad & Solution Controls */}
-              <div className="puzzle-interaction-zone">
-                <div className="input-instruction-row">
-                  <span className="input-instruction">
-                    👉 <strong>Select or click the missing single digit (0 to 9):</strong>
-                  </span>
-                  {selectedDigit !== '' && (
-                    <span className="selected-preview-badge">
-                      Selected: <strong>{selectedDigit}</strong>
-                    </span>
-                  )}
-                </div>
-
-                {/* 0-9 Digit Buttons Keypad */}
-                <div className="digit-keypad">
-                  {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((digit) => {
-                    const isSelected = selectedDigit === String(digit);
-                    return (
-                      <button
-                        key={digit}
-                        type="button"
-                        className={`digit-key-btn ${isSelected ? 'selected' : ''}`}
-                        onClick={() => setSelectedDigit(String(digit))}
-                        disabled={loadingPuzzle || submitting}
-                      >
-                        {digit}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Feedback Banner */}
-                {feedback && (
-                  <div className={`feedback-alert feedback-${feedback.type}`}>
-                    {feedback.type === 'success' ? (
-                      <CheckCircle2 size={22} className="alert-icon" />
-                    ) : feedback.type === 'hint' ? (
-                      <HelpCircle size={22} className="alert-icon" />
-                    ) : (
-                      <XCircle size={22} className="alert-icon" />
-                    )}
-                    <div className="feedback-content">
-                      <div className="feedback-message">{feedback.message}</div>
-                      {feedback.points && (
-                        <div className="points-awarded-badge">
-                          <Sparkles size={14} /> +{feedback.points} Points Earned!
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Action Buttons Row */}
-                <div className="arena-submit-actions">
-                  <div className="left-actions">
+                  <span className="no-class-text">
+                    No classrooms created yet.{' '}
                     <button
                       type="button"
-                      className="btn btn-outline btn-sm hint-btn"
+                      className="link-btn font-bold"
+                      onClick={() => setActiveTab('classrooms')}
+                    >
+                      + Create a classroom code
+                    </button>
+                  </span>
+                )}
+              </div>
+
+              <div className="leaderboard-actions-right">
+                {selectedClassroomCode && (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={() => copyToClipboard(selectedClassroomCode)}
+                    >
+                      {copiedCode === selectedClassroomCode ? (
+                        <>
+                          <Check size={14} /> Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={14} /> Copy Code: <strong>{selectedClassroomCode}</strong>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
                       onClick={() => {
-                        if (!puzzle) return;
-                        setShowHint(!showHint);
-                        if (!showHint) {
-                          const isEven = puzzle.solution % 2 === 0;
-                          const range = puzzle.solution >= 5 ? '5 or higher (5-9)' : '4 or lower (0-4)';
-                          setFeedback({
-                            type: 'hint',
-                            message: `💡 Hint: The missing digit is ${isEven ? 'EVEN' : 'ODD'} and is ${range}.`
-                          });
+                        if (onTestStudentChallenge) {
+                          onTestStudentChallenge(selectedClassroomCode);
                         }
                       }}
-                      disabled={loadingPuzzle || !puzzle}
+                      title="Open student view with this code"
                     >
-                      <HelpCircle size={15} /> {showHint ? 'Hide Hint' : 'Get Hint'}
+                      <GraduationCap size={14} /> Test as Student
                     </button>
-                  </div>
+                  </>
+                )}
 
-                  <div className="right-actions">
-                    {feedback?.type === 'success' ? (
-                      <button 
-                        type="button" 
-                        className="btn btn-success btn-lg next-puzzle-btn"
-                        onClick={fetchNewPuzzle}
-                      >
-                        Next Puzzle <ChevronRight size={18} />
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="btn btn-primary btn-lg submit-answer-btn"
-                        onClick={() => handleAnswerSubmit()}
-                        disabled={selectedDigit === '' || loadingPuzzle || submitting}
-                      >
-                        {submitting ? (
-                          <>
-                            <span className="spinner-border-sm"></span> Verifying...
-                          </>
-                        ) : (
-                          <>
-                            <Send size={16} /> Submit Answer
-                          </>
-                        )}
-                      </button>
-                    )}
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => loadClassroomLeaderboard(selectedClassroomCode)}
+                  disabled={loadingClassLeaderboard || !selectedClassroomCode}
+                >
+                  <RefreshCw size={13} className={loadingClassLeaderboard ? 'spin' : ''} /> Refresh
+                </button>
               </div>
             </div>
 
-            {/* Right: Quick Performance Sidebar */}
-            <div className="game-sidebar">
-              {/* Performance Summary Card */}
-              <div className="sidebar-card">
-                <div className="sidebar-card-header">
-                  <BarChartSummary stats={stats} />
+            {/* Metrics Overview */}
+            {selectedClassroomCode && (
+              <div className="class-metrics-grid">
+                <div className="class-metric-card">
+                  <div className="metric-icon-box users-icon">
+                    <Users size={18} />
+                  </div>
+                  <div>
+                    <div className="metric-num">{classroomStats?.totalStudents || classroomLeaderboard.length}</div>
+                    <div className="metric-label">Students Completed (10/10)</div>
+                  </div>
+                </div>
+
+                <div className="class-metric-card">
+                  <div className="metric-icon-box trophy-icon">
+                    <Trophy size={18} />
+                  </div>
+                  <div>
+                    <div className="metric-num">{classroomStats?.avgScore || 0} pts</div>
+                    <div className="metric-label">Class Average Score</div>
+                  </div>
+                </div>
+
+                <div className="class-metric-card">
+                  <div className="metric-icon-box star-icon">
+                    <CheckCircle2 size={18} />
+                  </div>
+                  <div>
+                    <div className="metric-num">{classroomStats?.perfectScoresCount || 0}</div>
+                    <div className="metric-label">Perfect 10/10 Scores</div>
+                  </div>
+                </div>
+
+                <div className="class-metric-card">
+                  <div className="metric-icon-box flame-icon">
+                    <Trophy size={18} />
+                  </div>
+                  <div>
+                    <div className="metric-num">
+                      {classroomLeaderboard[0]?.studentUsername || '—'}
+                    </div>
+                    <div className="metric-label">Top Scorer (Rank #1)</div>
+                  </div>
                 </div>
               </div>
+            )}
 
-              {/* User Session Profile Card */}
-              <div className="sidebar-card profile-summary-card">
-                <div className="sidebar-header-title">
-                  <UserIcon size={16} /> Player Profile
-                </div>
-                <div className="profile-rows">
-                  <div className="profile-row">
-                    <span className="row-label">User Email</span>
-                    <span className="row-value">{user?.email}</span>
-                  </div>
-                  <div className="profile-row">
-                    <span className="row-label">Role</span>
-                    <span className="row-value badge-role">{user?.role || 'student'}</span>
-                  </div>
-                  <div className="profile-row">
-                    <span className="row-label">Streak Status</span>
-                    <span className="row-value">
-                      {stats.currentStreak >= 3 ? '🔥 Streak Bonus Active!' : 'Standard (10 pts)'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="sidebar-actions-footer">
-                  <button 
-                    type="button" 
-                    className="btn btn-outline btn-xs"
-                    onClick={handleResetStats}
-                    title="Reset stats to 0"
-                  >
-                    <RotateCcw size={12} /> Reset Stats
-                  </button>
-                  <button 
-                    type="button" 
-                    className="btn btn-secondary btn-xs"
-                    onClick={() => {
-                      logout();
-                      if (onLogout) onLogout();
-                    }}
-                  >
-                    Sign Out
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ========================================================
-            TAB 2: CLASSROOM LEADERBOARD
-            ======================================================== */}
-        {activeTab === 'leaderboard' && (
-          <div className="leaderboard-wrapper">
+            {/* Leaderboard Table Card */}
             <div className="tab-card">
               <div className="tab-card-header">
                 <div>
-                  <h2 className="tab-card-title">🏆 Classroom Leaderboard</h2>
-                  <p className="tab-card-subtitle">Real-time ranking of students stored in MongoDB Atlas</p>
+                  <h2 className="tab-card-title">
+                    Leaderboard: {classroomDetails?.title || selectedClassroomCode || 'Select a Classroom'}
+                  </h2>
+                  <p className="tab-card-subtitle">
+                    Students who joined with code <strong>{selectedClassroomCode || 'N/A'}</strong> and completed all 10 puzzles.
+                  </p>
                 </div>
-                <button 
-                  className="btn btn-outline btn-sm"
-                  onClick={fetchLeaderboard}
-                  disabled={loadingLeaderboard}
-                >
-                  <RefreshCw size={14} className={loadingLeaderboard ? 'spin' : ''} /> Refresh
-                </button>
               </div>
 
-              {loadingLeaderboard ? (
+              {loadingClassLeaderboard ? (
                 <div className="tab-loading-state">
-                  <div className="spinner spinner-yellow"></div>
-                  <p>Fetching rankings from MongoDB Atlas...</p>
+                  <div className="spinner"></div>
+                  <p>Loading rankings...</p>
                 </div>
-              ) : leaderboard.length === 0 ? (
+              ) : !selectedClassroomCode ? (
                 <div className="empty-state-box">
-                  <Trophy size={42} color="#cbd5e1" />
-                  <p>No players on the leaderboard yet. Solve your first puzzle to take #1!</p>
-                  <button className="btn btn-primary btn-sm" onClick={() => setActiveTab('play')}>
-                    Play Now
+                  <Users size={40} color="#cbd5e1" />
+                  <p>You haven't created a classroom code yet.</p>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => setActiveTab('classrooms')}
+                  >
+                    + Create Your First Classroom Code
                   </button>
+                </div>
+              ) : classroomLeaderboard.length === 0 ? (
+                <div className="empty-state-box">
+                  <GraduationCap size={44} color="#cbd5e1" />
+                  <h3>No student submissions yet for code: {selectedClassroomCode}</h3>
+                  <p>
+                    Share code <strong>{selectedClassroomCode}</strong> with your students.
+                    They click <strong>"Student Join"</strong> in the navbar and enter their nickname to begin.
+                  </p>
+                  <div className="empty-actions">
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={() => copyToClipboard(selectedClassroomCode)}
+                    >
+                      <Copy size={14} /> Copy Classroom Code
+                    </button>
+                    {onTestStudentChallenge && (
+                      <button
+                        className="btn btn-outline btn-sm"
+                        onClick={() => onTestStudentChallenge(selectedClassroomCode)}
+                      >
+                        <GraduationCap size={14} /> Test Submission as Student
+                      </button>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="table-responsive">
@@ -632,109 +452,330 @@ export default function Dashboard({ onLogout }) {
                     <thead>
                       <tr>
                         <th>Rank</th>
-                        <th>Player</th>
-                        <th>Total Score</th>
+                        <th>Student Username</th>
+                        <th>Score</th>
                         <th>Solved</th>
-                        <th>Win Rate</th>
-                        <th>Best Streak</th>
+                        <th>Accuracy</th>
+                        <th>Total Time</th>
+                        <th>Completed</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {leaderboard.map((item) => {
-                        const isCurrentUser = user && (user.id === item.id || user.email === item.maskedEmail);
-                        return (
-                          <tr key={item.id} className={isCurrentUser ? 'current-user-row' : ''}>
-                            <td className="rank-cell">
-                              {item.rank === 1 ? '🥇 1' : item.rank === 2 ? '🥈 2' : item.rank === 3 ? '🥉 3' : `#${item.rank}`}
-                            </td>
-                            <td className="player-cell">
-                              <span className="player-name">{item.name}</span>
-                              {isCurrentUser && <span className="you-pill">You</span>}
-                            </td>
-                            <td className="score-cell">
-                              <strong>{item.score}</strong> pts
-                            </td>
-                            <td>{item.gamesWon} / {item.gamesPlayed}</td>
-                            <td>
-                              <div className="progress-bar-wrap">
-                                <span className="progress-text">{item.winRate}%</span>
-                                <div className="progress-track">
-                                  <div className="progress-fill" style={{ width: `${item.winRate}%` }}></div>
-                                </div>
-                              </div>
-                            </td>
-                            <td>{item.bestStreak} 🔥</td>
-                          </tr>
-                        );
-                      })}
+                      {classroomLeaderboard.map((item) => (
+                        <tr key={item.id}>
+                          <td className="rank-cell">
+                            {item.rank === 1 ? '🥇 #1' : item.rank === 2 ? '🥈 #2' : item.rank === 3 ? '🥉 #3' : `#${item.rank}`}
+                          </td>
+                          <td className="player-cell">
+                            <span className="player-name-bold">{item.studentUsername}</span>
+                          </td>
+                          <td className="score-cell font-bold">{item.score} pts</td>
+                          <td>
+                            <span className="tag-solved">
+                              {item.correctCount} / {item.totalPuzzles || 10}
+                            </span>
+                          </td>
+                          <td>
+                            <span
+                              className={`accuracy-pill ${
+                                item.accuracy >= 80 ? 'acc-high' : item.accuracy >= 50 ? 'acc-mid' : 'acc-low'
+                              }`}
+                            >
+                              {item.accuracy}%
+                            </span>
+                          </td>
+                          <td className="time-cell">{formatTime(item.totalTimeSec)}</td>
+                          <td className="date-cell">
+                            {new Date(item.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              className="btn btn-outline btn-xs"
+                              onClick={() => setInspectStudent(item)}
+                              title="View individual question results"
+                            >
+                              <Eye size={12} /> View Answers
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
               )}
             </div>
+
+            {/* Modal: Inspect Student's 10 Puzzle Answers */}
+            {inspectStudent && (
+              <div className="modal-overlay" onClick={() => setInspectStudent(null)}>
+                <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+                  <div className="modal-header">
+                    <div>
+                      <h3 className="modal-title">
+                        Results: {inspectStudent.studentUsername}
+                      </h3>
+                      <p className="modal-subtitle">
+                        Score: <strong>{inspectStudent.score} pts</strong> • Solved:{' '}
+                        <strong>
+                          {inspectStudent.correctCount} / {inspectStudent.totalPuzzles}
+                        </strong>{' '}
+                        • Time: <strong>{formatTime(inspectStudent.totalTimeSec)}</strong>
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="modal-close-btn"
+                      onClick={() => setInspectStudent(null)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <div className="modal-body">
+                    {inspectStudent.puzzles && inspectStudent.puzzles.length > 0 ? (
+                      <div className="student-puzzles-breakdown">
+                        {inspectStudent.puzzles.map((p, idx) => (
+                          <div
+                            key={idx}
+                            className={`puzzle-inspect-row ${
+                              p.isCorrect ? 'row-correct' : 'row-incorrect'
+                            }`}
+                          >
+                            <div className="inspect-col-idx">
+                              <span className="badge-q-num">Q{p.puzzleIndex || idx + 1}</span>
+                              {p.isCorrect ? (
+                                <CheckCircle2 size={16} color="#16a34a" />
+                              ) : (
+                                <XCircle size={16} color="#dc2626" />
+                              )}
+                            </div>
+
+                            {p.question && (
+                              <div className="inspect-col-img">
+                                <img
+                                  src={p.question}
+                                  alt={`Puzzle ${idx + 1}`}
+                                  className="inspect-thumb-img"
+                                />
+                              </div>
+                            )}
+
+                            <div className="inspect-col-details">
+                              <div>
+                                Student Guess: <strong>{p.userGuess}</strong>
+                              </div>
+                              <div>
+                                Solution: <strong className="sol-badge">{p.solution}</strong>
+                              </div>
+                              {p.timeTakenSec > 0 && (
+                                <div className="inspect-time">
+                                  <Clock size={11} /> {p.timeTakenSec}s
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p>Detailed per-question log not available for this entry.</p>
+                    )}
+                  </div>
+
+                  <div className="modal-footer">
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => setInspectStudent(null)}
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {/* ========================================================
-            TAB 3: MATCH HISTORY
+            TAB 2: MANAGE CLASSROOMS & CODES
             ======================================================== */}
-        {activeTab === 'history' && (
-          <div className="history-wrapper">
-            <div className="tab-card">
+        {activeTab === 'classrooms' && (
+          <div className="manage-classrooms-view">
+            {/* Create Classroom Card */}
+            <div className="tab-card create-class-card">
               <div className="tab-card-header">
                 <div>
-                  <h2 className="tab-card-title">📜 Recent Puzzle History</h2>
-                  <p className="tab-card-subtitle">Log of your past answers and results stored in your account</p>
+                  <h2 className="tab-card-title">Create a Classroom Code</h2>
+                  <p className="tab-card-subtitle">
+                    Generate a code that students can enter in the navbar to participate in the 10 Math Puzzle Challenge.
+                  </p>
                 </div>
-                <button className="btn btn-outline btn-sm" onClick={loadStatsAndHistory}>
-                  <RefreshCw size={14} /> Refresh
+              </div>
+
+              {createNotice.text && (
+                <div
+                  className={`alert ${
+                    createNotice.type === 'success' ? 'alert-success' : 'alert-error'
+                  }`}
+                >
+                  {createNotice.type === 'success' ? (
+                    <CheckCircle2 size={16} />
+                  ) : (
+                    <XCircle size={16} />
+                  )}
+                  <span>{createNotice.text}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleCreateClassroom} className="create-class-form">
+                <div className="form-row-2col">
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="new-class-title">
+                      Classroom / Challenge Name
+                    </label>
+                    <input
+                      id="new-class-title"
+                      type="text"
+                      className="input-field"
+                      placeholder="e.g. Period 2 Math, Grade 7 Challenge"
+                      value={newClassTitle}
+                      onChange={(e) => setNewClassTitle(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <div className="label-with-hint">
+                      <label className="form-label" htmlFor="new-class-code">
+                        Classroom Code (Optional)
+                      </label>
+                      <span className="label-hint">Leave blank to auto-generate</span>
+                    </div>
+                    <div className="input-with-button">
+                      <input
+                        id="new-class-code"
+                        type="text"
+                        className="input-field code-input"
+                        placeholder="e.g. MATH-101"
+                        value={newClassCode}
+                        onChange={(e) => setNewClassCode(e.target.value.toUpperCase())}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm gen-code-btn"
+                        onClick={() =>
+                          setNewClassCode(`MATH-${Math.floor(1000 + Math.random() * 9000)}`)
+                        }
+                      >
+                        Auto-Gen
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="btn btn-primary submit-create-btn"
+                  disabled={creatingClass}
+                >
+                  {creatingClass ? (
+                    'Creating Classroom...'
+                  ) : (
+                    <>
+                      <Plus size={15} /> Create Classroom Code
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
+
+            {/* List of Created Classrooms */}
+            <div className="tab-card existing-classes-card">
+              <div className="tab-card-header">
+                <div>
+                  <h2 className="tab-card-title">Your Active Classrooms ({myClassrooms.length})</h2>
+                  <p className="tab-card-subtitle">
+                    All classroom codes you have created for your students.
+                  </p>
+                </div>
+                <button
+                  className="btn btn-outline btn-sm"
+                  onClick={loadTeacherClassrooms}
+                  disabled={loadingClassrooms}
+                >
+                  <RefreshCw size={13} className={loadingClassrooms ? 'spin' : ''} /> Refresh
                 </button>
               </div>
 
-              {historyList.length === 0 ? (
+              {loadingClassrooms ? (
+                <div className="tab-loading-state">
+                  <div className="spinner"></div>
+                  <p>Loading classrooms...</p>
+                </div>
+              ) : myClassrooms.length === 0 ? (
                 <div className="empty-state-box">
-                  <History size={42} color="#cbd5e1" />
-                  <p>You haven't played any puzzles yet. Start playing now to build your history!</p>
-                  <button className="btn btn-primary btn-sm" onClick={() => setActiveTab('play')}>
-                    Play First Puzzle
-                  </button>
+                  <Users size={38} color="#cbd5e1" />
+                  <p>No classroom codes created yet.</p>
                 </div>
               ) : (
-                <div className="history-cards-grid">
-                  {historyList.map((entry, index) => (
-                    <div 
-                      key={index} 
-                      className={`history-item-card ${entry.isCorrect ? 'history-correct' : 'history-incorrect'}`}
-                    >
-                      <div className="history-thumb-frame">
-                        {entry.question ? (
-                          <img src={entry.question} alt="Puzzle thumbnail" className="history-thumb-img" />
-                        ) : (
-                          <div className="no-img-thumb">No Preview</div>
-                        )}
-                        <span className={`status-tag ${entry.isCorrect ? 'tag-win' : 'tag-loss'}`}>
-                          {entry.isCorrect ? 'Correct (+10)' : 'Incorrect'}
-                        </span>
+                <div className="classrooms-cards-grid">
+                  {myClassrooms.map((cls) => (
+                    <div key={cls._id} className="classroom-item-card">
+                      <div className="class-card-top">
+                        <div className="class-code-badge">
+                          <span>CODE:</span>
+                          <strong>{cls.code}</strong>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-icon-copy"
+                          onClick={() => copyToClipboard(cls.code)}
+                          title="Copy Classroom Code"
+                        >
+                          {copiedCode === cls.code ? <Check size={14} /> : <Copy size={14} />}
+                        </button>
                       </div>
 
-                      <div className="history-info-body">
-                        <div className="history-info-row">
-                          <span className="info-muted">Your Guess:</span>
-                          <span className="info-bold">{entry.userGuess}</span>
+                      <h3 className="class-title-heading">{cls.title}</h3>
+                      <p className="class-desc-text">{cls.description}</p>
+
+                      <div className="class-stats-row">
+                        <div className="class-stat-mini">
+                          <span className="stat-mini-num">{cls.studentCount || 0}</span>
+                          <span className="stat-mini-label">Completed</span>
                         </div>
-                        <div className="history-info-row">
-                          <span className="info-muted">Actual Solution:</span>
-                          <span className="info-bold solution-color">{entry.solution}</span>
+                        <div className="class-stat-mini">
+                          <span className="stat-mini-num">{cls.avgScore || 0} pts</span>
+                          <span className="stat-mini-label">Avg Score</span>
                         </div>
-                        {entry.timeTakenSec > 0 && (
-                          <div className="history-info-row">
-                            <span className="info-muted">Time:</span>
-                            <span>{entry.timeTakenSec}s</span>
-                          </div>
-                        )}
-                        <div className="history-date">
-                          {entry.playedAt ? new Date(entry.playedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent'}
+                        <div className="class-stat-mini">
+                          <span className="stat-mini-num">{cls.topScore || 0} pts</span>
+                          <span className="stat-mini-label">Top Score</span>
                         </div>
+                      </div>
+
+                      <div className="class-card-footer">
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm flex-1"
+                          onClick={() => {
+                            setSelectedClassroomCode(cls.code);
+                            setActiveTab('classroom-leaderboard');
+                          }}
+                        >
+                          <Trophy size={14} /> View Leaderboard
+                        </button>
+
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm delete-class-btn"
+                          onClick={() => handleDeleteClassroom(cls._id, cls.code, cls.title)}
+                          title="Delete classroom"
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -743,36 +784,6 @@ export default function Dashboard({ onLogout }) {
             </div>
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-// Subcomponent: Performance Metrics Bar Chart Summary
-function BarChartSummary({ stats }) {
-  return (
-    <div className="metrics-box">
-      <div className="metrics-header">
-        <Award size={18} color="#eab308" />
-        <h3>Your Learning Stats</h3>
-      </div>
-      <div className="metrics-grid">
-        <div className="metric-cell">
-          <span className="metric-num">{stats.score}</span>
-          <span className="metric-label">Points</span>
-        </div>
-        <div className="metric-cell">
-          <span className="metric-num">{stats.gamesWon}</span>
-          <span className="metric-label">Solved</span>
-        </div>
-        <div className="metric-cell">
-          <span className="metric-num">{stats.gamesPlayed}</span>
-          <span className="metric-label">Played</span>
-        </div>
-        <div className="metric-cell">
-          <span className="metric-num">{stats.winRate}%</span>
-          <span className="metric-label">Accuracy</span>
-        </div>
       </div>
     </div>
   );
