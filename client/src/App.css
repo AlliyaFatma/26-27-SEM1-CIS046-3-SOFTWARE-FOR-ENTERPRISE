@@ -1,0 +1,386 @@
+/* ========================================================
+   Clean, Minimal UI Stylesheet
+   ======================================================== */
+
+.app-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #f8fafc;
+}
+
+.main-content {
+  flex: 1;
+}
+
+/* Loading Screen */
+.loading-screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  color: var(--text-muted);
+}
+
+/* ========================================================
+   Navbar
+   ======================================================== */
+.navbar {
+  background: #ffffff;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.nav-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+}
+
+.brand {
+  cursor: pointer;
+  user-select: none;
+}
+
+.brand-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: -0.02em;
+}
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+}
+
+.auth-buttons,
+.user-nav-menu {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.user-email-tag {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  padding: 0.35rem 0.65rem;
+  background: var(--bg-card-subtle);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.btn-sm {
+  padding: 0.45rem 0.9rem;
+  font-size: 0.875rem;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0.4rem 0.6rem;
+}
+
+.btn-link:hover,
+.btn-link.active-link {
+  color: var(--text-main);
+}
+
+/* ========================================================
+   Simple Landing Page
+   ======================================================== */
+.simple-landing {
+  display: flex;
+  flex-direction: column;
+}
+
+.simple-hero {
+  padding: 5rem 0 3.5rem;
+  text-align: center;
+  background: #ffffff;
+  border-bottom: 1px solid var(--border);
+}
+
+.simple-hero-content {
+  max-width: 620px;
+  margin: 0 auto;
+}
+
+.simple-title {
+  font-size: 2.75rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text-main);
+  margin-bottom: 1rem;
+}
+
+.simple-subtitle {
+  font-size: 1.15rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-bottom: 2rem;
+}
+
+.simple-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+/* Landing Info Cards */
+.simple-info-section {
+  padding: 4.5rem 0;
+}
+
+.simple-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.simple-card {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 2rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.simple-card h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 0.65rem;
+}
+
+.simple-card p {
+  font-size: 0.925rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+/* Footer */
+.simple-footer {
+  padding: 2.5rem 0;
+  text-align: center;
+  color: var(--text-light);
+  font-size: 0.85rem;
+  border-top: 1px solid var(--border);
+  background: #ffffff;
+}
+
+/* ========================================================
+   Auth Page (Login / Sign Up Form)
+   ======================================================== */
+.auth-view-container {
+  min-height: calc(100vh - 64px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1.5rem;
+}
+
+.auth-card-wrapper {
+  width: 100%;
+  max-width: 420px;
+}
+
+.auth-card {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid var(--border);
+  background: #f8fafc;
+}
+
+.auth-tab {
+  background: transparent;
+  border: none;
+  padding: 0.9rem 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border-bottom: 2px solid transparent;
+}
+
+.auth-tab.active {
+  color: var(--text-main);
+  background: #ffffff;
+  border-bottom-color: var(--primary);
+}
+
+.auth-card-body {
+  padding: 2rem;
+}
+
+.auth-header {
+  margin-bottom: 1.5rem;
+}
+
+.auth-header h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 0.25rem;
+}
+
+.auth-header p {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.label-with-hint {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.label-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.submit-btn {
+  margin-top: 0.75rem;
+}
+
+.auth-footer-note {
+  margin-top: 1.25rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--primary-dark);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+  font-size: inherit;
+}
+
+/* ========================================================
+   Clean, Text-Only Dashboard
+   ======================================================== */
+.simple-dashboard-wrapper {
+  min-height: calc(100vh - 64px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+}
+
+.simple-dashboard-card {
+  width: 100%;
+  max-width: 520px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 2.25rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.simple-card-header {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.simple-card-header h2 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 0.25rem;
+}
+
+.text-muted {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.simple-user-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-bottom: 2rem;
+}
+
+.simple-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.65rem 0.85rem;
+  background: var(--bg-main);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
+.detail-label {
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.detail-value {
+  color: var(--text-main);
+  font-weight: 500;
+}
+
+.text-mono {
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.status-active {
+  color: #065f46;
+  font-weight: 600;
+}
+
+.simple-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--border);
+  padding-top: 1.25rem;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .simple-title {
+    font-size: 2.1rem;
+  }
+
+  .simple-dashboard-card {
+    padding: 1.5rem;
+  }
+
+  .simple-detail-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+}
