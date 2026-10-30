@@ -106,6 +106,36 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Refresh user profile from server
+  const refreshUser = async () => {
+    const storedToken = localStorage.getItem('banana_token') || token;
+    if (!storedToken) return null;
+    try {
+      const response = await fetch('/api/auth/me', {
+        headers: { 'Authorization': `Bearer ${storedToken}` }
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setUser(data.user);
+        localStorage.setItem('banana_user', JSON.stringify(data.user));
+        return data.user;
+      }
+    } catch (err) {
+      console.error('Error refreshing user:', err);
+    }
+    return null;
+  };
+
+  // Update user in state and localStorage
+  const updateUser = (fields) => {
+    setUser(prev => {
+      if (!prev) return null;
+      const updated = { ...prev, ...fields };
+      localStorage.setItem('banana_user', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   // Logout handler
   const logout = () => {
     localStorage.removeItem('banana_token');
@@ -126,6 +156,8 @@ export const AuthProvider = ({ children }) => {
         login,
         register,
         logout,
+        updateUser,
+        refreshUser,
         isAuthenticated: !!user
       }}
     >
