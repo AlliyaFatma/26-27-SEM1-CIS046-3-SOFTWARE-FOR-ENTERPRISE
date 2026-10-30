@@ -4,11 +4,14 @@ import Navbar from './components/Navbar';
 import LandingPage from './components/LandingPage';
 import AuthForm from './components/AuthForm';
 import Dashboard from './components/Dashboard';
+import StudentChallenge from './components/StudentChallenge';
 import './App.css';
 
 function MainApp() {
   const { user, isAuthenticated, loading } = useAuth();
-  const [currentView, setCurrentView] = useState('landing'); // 'landing' | 'login' | 'signup' | 'dashboard'
+  // 'landing' | 'login' | 'signup' | 'dashboard' | 'student-challenge'
+  const [currentView, setCurrentView] = useState('landing');
+  const [prefilledClassroomCode, setPrefilledClassroomCode] = useState('');
 
   // If user becomes authenticated, switch to dashboard
   useEffect(() => {
@@ -26,6 +29,11 @@ function MainApp() {
     );
   }
 
+  const handleOpenStudentChallenge = (code = '') => {
+    if (code) setPrefilledClassroomCode(code);
+    setCurrentView('student-challenge');
+  };
+
   return (
     <div className="app-layout">
       <Navbar currentView={currentView} setCurrentView={setCurrentView} />
@@ -35,6 +43,7 @@ function MainApp() {
           <LandingPage 
             onGetStarted={() => setCurrentView('signup')}
             onLogin={() => setCurrentView('login')}
+            onStudentJoin={() => handleOpenStudentChallenge('')}
           />
         )}
 
@@ -48,9 +57,19 @@ function MainApp() {
           </div>
         )}
 
+        {currentView === 'student-challenge' && (
+          <StudentChallenge 
+            prefilledCode={prefilledClassroomCode}
+            onBackToHome={() => setCurrentView('landing')}
+          />
+        )}
+
         {currentView === 'dashboard' && (
           isAuthenticated ? (
-            <Dashboard onLogout={() => setCurrentView('landing')} />
+            <Dashboard 
+              onLogout={() => setCurrentView('landing')} 
+              onTestStudentChallenge={(code) => handleOpenStudentChallenge(code)}
+            />
           ) : (
             <div className="auth-view-container">
               <AuthForm 
@@ -73,4 +92,3 @@ export default function App() {
     </AuthProvider>
   );
 }
-
