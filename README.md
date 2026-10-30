@@ -107,9 +107,30 @@ Frontend will run at: `http://localhost:5173`
 
 ## 🔑 API Endpoints
 
+### 🔐 Authentication Endpoints
 | Method | Endpoint | Description | Protected |
 |---|---|---|---|
 | `POST` | `/api/auth/register` | Register a new user | No |
 | `POST` | `/api/auth/login` | Authenticate user & get JWT token | No |
 | `GET` | `/api/auth/me` | Fetch current user profile | Yes (`Bearer <token>`) |
 | `GET` | `/api/health` | Health check endpoint | No |
+
+### 🍌 Banana Game Endpoints (Marc Conrad API)
+| Method | Endpoint | Description | Protected |
+|---|---|---|---|
+| `GET` | `/api/game/puzzle` | Fetch new puzzle from Marc Conrad API (`https://marcconrad.com/uob/banana/api.php`) | No |
+| `POST` | `/api/game/record` | Submit guess, compute points, streak & update MongoDB | Yes (`Bearer <token>`) |
+| `GET` | `/api/game/stats` | Retrieve user stats, win rate & recent history | Yes (`Bearer <token>`) |
+| `GET` | `/api/game/leaderboard` | Top 10 classroom ranking by score | No |
+| `POST` | `/api/game/reset` | Reset player score & streaks | Yes (`Bearer <token>`) |
+
+---
+
+## 🎮 Dr. Marc Conrad Banana API Integration
+
+- **External API Reference**: [Marc Conrad Banana Game API Documentation](https://marcconrad.com/uob/banana/doc.php)
+- **Original Game Demo**: [The Banana Game Demo](https://marcconrad.com/uob/banana/)
+- **Dashboard Features**:
+  1. **Banana Math Arena**: Live puzzle image rendering from Dr. Marc Conrad's API with responsive 0–9 keypad input, keyboard controls, real-time verification, round timer, and hints.
+  2. **Classroom Leaderboard**: Real-time rank of top students with win rates and points.
+  3. **Match History**: Persistent log of puzzle attempts, guesses, answers, and scores in MongoDB Atlas.
