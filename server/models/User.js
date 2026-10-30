@@ -31,7 +31,38 @@ const userSchema = new mongoose.Schema(
       type: String,
       enum: ['student', 'teacher', 'admin'],
       default: 'student'
-    }
+    },
+    score: {
+      type: Number,
+      default: 0
+    },
+    gamesPlayed: {
+      type: Number,
+      default: 0
+    },
+    gamesWon: {
+      type: Number,
+      default: 0
+    },
+    currentStreak: {
+      type: Number,
+      default: 0
+    },
+    bestStreak: {
+      type: Number,
+      default: 0
+    },
+    history: [
+      {
+        question: { type: String, required: true },
+        userGuess: { type: Number, required: true },
+        solution: { type: Number, required: true },
+        isCorrect: { type: Boolean, required: true },
+        pointsEarned: { type: Number, default: 0 },
+        timeTakenSec: { type: Number, default: 0 },
+        playedAt: { type: Date, default: Date.now }
+      }
+    ]
   },
   {
     timestamps: true

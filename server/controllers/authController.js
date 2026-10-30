@@ -64,7 +64,12 @@ const registerUser = async (req, res) => {
           id: user._id,
           name: user.name,
           email: user.email,
-          role: user.role
+          role: user.role,
+          score: user.score || 0,
+          gamesPlayed: user.gamesPlayed || 0,
+          gamesWon: user.gamesWon || 0,
+          currentStreak: user.currentStreak || 0,
+          bestStreak: user.bestStreak || 0
         }
       });
     } else {
@@ -125,7 +130,12 @@ const loginUser = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        score: user.score || 0,
+        gamesPlayed: user.gamesPlayed || 0,
+        gamesWon: user.gamesWon || 0,
+        currentStreak: user.currentStreak || 0,
+        bestStreak: user.bestStreak || 0
       }
     });
   } catch (error) {
@@ -154,6 +164,11 @@ const getMe = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        score: user.score || 0,
+        gamesPlayed: user.gamesPlayed || 0,
+        gamesWon: user.gamesWon || 0,
+        currentStreak: user.currentStreak || 0,
+        bestStreak: user.bestStreak || 0,
         createdAt: user.createdAt
       }
     });
