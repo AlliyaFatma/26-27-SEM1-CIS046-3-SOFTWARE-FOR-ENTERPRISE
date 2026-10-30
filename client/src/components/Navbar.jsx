@@ -21,9 +21,10 @@ export default function Navbar({ currentView, setCurrentView }) {
         <div className="nav-actions">
           {isAuthenticated ? (
             <div className="user-nav-menu">
+              <span className="user-score-pill">🍌 {user?.score || 0} pts</span>
               <span className="user-email-tag">{user?.email}</span>
               <button
-                className="btn btn-outline btn-sm"
+                className={`btn btn-outline btn-sm ${currentView === 'dashboard' ? 'active' : ''}`}
                 onClick={() => setCurrentView('dashboard')}
               >
                 Dashboard
