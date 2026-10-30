@@ -13,7 +13,7 @@ export default function AuthForm({ initialMode = 'login', onAuthSuccess, onSwitc
   const [mode, setMode] = useState(initialMode); // 'login' | 'signup'
   const { login, register, authError, setAuthError } = useAuth();
 
-  // Form Fields (Email & Password only)
+  // Form Fields (Email & Password)
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -68,7 +68,7 @@ export default function AuthForm({ initialMode = 'login', onAuthSuccess, onSwitc
       if (mode === 'login') {
         result = await login(email.trim(), password);
       } else {
-        result = await register(email.trim(), password);
+        result = await register(email.trim(), password, 'teacher');
       }
 
       if (result.success) {

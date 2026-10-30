@@ -78,14 +78,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Register handler (email and password only)
-  const register = async (email, password) => {
+  // Register handler (email, password, role)
+  const register = async (email, password, role = 'teacher') => {
     setAuthError(null);
     try {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password, role })
       });
 
       const data = await response.json();
